@@ -37,3 +37,4 @@ seed('concurrent-original',1);
 const racers=await Promise.allSettled(Array.from({length:25},(_,i)=>createCheckout(input('concurrent-original'),'racer-'+i)));
 assert.equal(racers.filter(r=>r.status==='fulfilled').length,1);assert.equal(stock('concurrent-original'),0);
 console.log('PASS: 25 simultaneous checkout attempts for one original reserve exactly one unit');
+seed('account-art',1);const accountAttempt=await createCheckout({...input('account-art'),userId:'forged-user'},'account-session','verified-user');capture(accountAttempt,'pay_Account');await confirmPayment('pay_Account');assert.equal(sqlite.prepare('SELECT user_id FROM order_owners WHERE order_id=?').get(accountAttempt.id).user_id,'verified-user');console.log('PASS: account ownership is attached from trusted server identity and survives payment reconciliation');

@@ -1,3 +1,4 @@
+import {getChatGPTUser} from '@/app/chatgpt-auth';
 import {database,limit} from '@/lib/shop';
 import {sessionId} from '@/lib/payments';
 import {trackingOrders} from '@/lib/tracking';
@@ -6,7 +7,7 @@ import {kickJobs} from '@/lib/jobs';
 import {z} from 'zod';
 export const dynamic='force-dynamic';
 const reply=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'private, no-store',...(status===429?{'Retry-After':'60'}:{})}});
-export async function GET(req:Request){try{await limit(req,'tracking-read',120);const raw=new URL(req.url).searchParams.get('before');const before=raw?z.coerce.number().int().positive().parse(raw):Date.now()+1;kickJobs();return reply(await trackingOrders(database(),sessionId(req),undefined,before));}catch(e){return reply({error:'Could not load orders. Please try again shortly.'},String(e).includes('Too many requests')?429:503)}}
+export async function GET(req:Request){try{await limit(req,'tracking-read',120);const raw=new URL(req.url).searchParams.get('before');const before=raw?z.coerce.number().int().positive().parse(raw):Date.now()+1;kickJobs();return reply(await trackingOrders(database(),sessionId(req),undefined,before,(await getChatGPTUser())?.userId||null));}catch(e){return reply({error:'Could not load orders. Please try again shortly.'},String(e).includes('Too many requests')?429:503)}}
 export async function POST(req:Request){try{
  if(req.headers.get('origin')!==new URL(req.url).origin)return reply({error:'Invalid origin'},403);
  await limit(req,'tracking-lookup',10);

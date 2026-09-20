@@ -1,0 +1,4 @@
+import {getChatGPTUser,chatGPTSignInPath,chatGPTSignOutPath} from '@/app/chatgpt-auth';
+import Account from './account';
+export const dynamic='force-dynamic';
+export default async function Page(){const user=await getChatGPTUser();return <><header className="header"><a className="brand" href="/">artelier<span>✳</span></a><a href="/">Back to the collection</a></header>{user?<Account signOut={chatGPTSignOutPath('/')}/>:<main className="account-page"><span className="eyebrow">YOUR ARTELIER</span><h1>A space for your favourites.</h1><p>Save pieces you love, keep delivery addresses, and manage your purchases across devices.</p><div className="account-signin"><h2>Welcome back—or welcome in.</h2><p>Use your ChatGPT account to sign in securely. You can still browse and check out as a guest.</p><a className="primary" href={chatGPTSignInPath('/account')} target="_top">Sign in with ChatGPT →</a><a href="/orders">Track a guest order</a></div></main>}</>}

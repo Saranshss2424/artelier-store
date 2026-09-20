@@ -29,3 +29,18 @@ The managed Site exposes D1 and R2; a native Cloudflare Queues consumer, Cron Tr
 - TypeScript and production build must pass before publication.
 
 Before claiming a supported peak, agree expected concurrent visitors, browse/checkout mix, order volume and latency targets. Run sustained staging tests with realistic inventory and test-gateway traffic; measure p95 latency, error rates, D1 saturation, queue age and recovery. No production stress test or live gateway payment was performed for this release.
+
+## Customer shopping features
+
+- `/account` uses the platform's **Sign in with ChatGPT**. No email/password, phone OTP or independent Google sign-in has been added. Browsing and guest checkout remain available. All account APIs derive ownership from the trusted signed-in user; client-supplied user IDs are ignored.
+- New signed-in purchases are linked transactionally at stock reservation, including payments that reconcile later. Customers can explicitly link unclaimed guest orders from their current browser. Orders are never linked merely because an email matches. Once linked, account orders are excluded from another user's browser-session history; the existing limited reference-plus-email guest lookup still works.
+- Up to five private delivery addresses, reusable in checkout, and up to 100 wishlist pieces are stored in D1. Account requests are `private, no-store`. Carts remain browser-session-based rather than synchronized across accounts/devices.
+- Real artwork has a shareable `/art/<id>` page, current availability, quantities, related pieces from the same category, and reviews. Related pieces use category matching, not AI personalization. Homepage search includes descriptions, plus price/in-stock filters and rating sort. Demo samples cannot be wishlisted or reviewed.
+- Reviews require ownership of a delivered order containing the exact product. There is one review per order/product; editing resets moderation to Pending. Only Published reviews affect public ratings. Customers choose the public display name; account email is never published automatically. Owner moderation should apply consistent content rules regardless of rating.
+- Customers can request a return for a delivered purchase and see the studio's response. One request is allowed per order. Stages are Requested → Approved/Declined → Received → Refund pending/Closed. This release does not adopt a return window or guarantee acceptance. Closing a request does not refund money or replenish inventory; the owner must verify those actions separately.
+- Studio summaries show paid order value (excluding COD, full refunds and refund-required orders), awaiting fulfillment, low-stock listings and open return requests. Paid order value is not an accounting/net-revenue report; partial refunds and fees are not deducted.
+- Account purchase/review/return views and studio moderation are bounded to 100 records per section. Add server pagination before exceeding this operational size.
+
+Validation: `node tests/customer.test.mjs` exercises account isolation, address caps, wishlist uniqueness, guest linking, cross-device order access, delivered-purchase verification, review moderation and return transitions. Payment regression tests cover trusted account assignment at reservation. Hosted multi-user sign-in should be checked with real customer accounts before commercial launch.
+
+Still separate work: live payment activation, transactional email/SMS, independent customer auth providers, coupons/promotions, automated refunds and pickups, seller onboarding/payouts, art provenance/AR, and production capacity/security validation. This release does not claim parity with a large marketplace.

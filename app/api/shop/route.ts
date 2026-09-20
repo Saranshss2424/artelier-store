@@ -1,3 +1,4 @@
+import {getChatGPTUser} from '@/app/chatgpt-auth';
 import {invalidateCatalog} from '@/lib/catalog';
 import {kickJobs} from '@/lib/jobs';
 import { database, isAdmin, runtime, limit, cashfreeApi, cashfreeConfig, markOrderPaid, releaseExpiredReservations, releaseOrderReservation } from '@/lib/shop';
@@ -29,13 +30,14 @@ async function productLines(items:Array<{id:string;qty:number}>){
  return {lines,total:lines.reduce((n,p)=>n+p.price*p.qty,0)};
 }
 
-async function reserveOrder(orderId:string,s:string,customerData:any,items:Array<{id:string;qty:number}>,paymentMethod:'cod'|'online'){
+async function reserveOrder(orderId:string,s:string,customerData:any,items:Array<{id:string;qty:number}>,paymentMethod:'cod'|'online',userId:string|null=null){
  const db=database();
  const {lines,total}=await productLines(items);
  const gatewayOrderId=paymentMethod==='online'?`art_${orderId.replaceAll('-','')}`:null;
  await db.batch([
   ...lines.map(p=>db.prepare('UPDATE products SET stock=stock-? WHERE id=?').bind(p.qty,p.id)),
   db.prepare('INSERT INTO orders(id,session,customer,items,total,status,payment_method,payment_status,gateway_order_id,stock_released,created) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(orderId,s,JSON.stringify(customerData),JSON.stringify(lines),total,'Pending',paymentMethod,paymentMethod==='online'?'Awaiting':'Unpaid',gatewayOrderId,0,Date.now()),
+  ...(userId?[db.prepare('INSERT INTO order_owners(order_id,user_id) VALUES(?,?)').bind(orderId,userId)]:[]),
   db.prepare('DELETE FROM carts WHERE id=?').bind(s),
  ]);
  return {lines,total,gatewayOrderId};
@@ -112,7 +114,7 @@ export async function POST(req:Request){
    if(existing)return reply({order:publicOrder(existing)},s);
    const details=customer.parse(b.customer);
    const items=z.array(item).min(1).max(40).parse(b.items);
-   const {total}=await reserveOrder(key,s,details,items,'cod');
+   const {total}=await reserveOrder(key,s,details,items,'cod',(await getChatGPTUser())?.userId||null);
    return reply({order:{id:key,total,payment_method:'cod',payment_status:'Unpaid'}},s,201);
   }
 
@@ -125,7 +127,7 @@ export async function POST(req:Request){
    if(existing)throw new ShopError('This checkout attempt has expired. Refresh your bag and try again.',409);
    const details=customer.parse(b.customer);
    const items=z.array(item).min(1).max(40).parse(b.items);
-   const {total,gatewayOrderId}=await reserveOrder(key,s,details,items,'online');
+   const {total,gatewayOrderId}=await reserveOrder(key,s,details,items,'online',(await getChatGPTUser())?.userId||null);
    const origin=new URL(req.url).origin;
    try{
     const r=await cashfreeApi('/orders',{method:'POST',headers:{'x-idempotency-key':key},body:JSON.stringify({order_id:gatewayOrderId,order_amount:total/100,order_currency:'INR',customer_details:{customer_id:s,customer_name:details.name,customer_email:details.email,customer_phone:details.phone.replace(/[^0-9]/g,'')},order_meta:{return_url:`${origin}/?payment=${encodeURIComponent(key)}`,notify_url:`${origin}/api/payment/webhook`},order_note:'Artelier artwork order',order_tags:{internal_order_id:key}})});

@@ -79,3 +79,7 @@ See [the proposed architecture](docs/ARCHITECTURE-ROADMAP.md) for the owner’s 
 ## Tracking and operations
 
 Customer order tracking, owner courier details, short-lived catalog caching and durable webhook jobs are implemented. See [operations and scheduler setup](docs/OPERATIONS.md) for exact limits, tests and remaining integrations. The optional scheduled runner still needs its shared secret configured. Live courier tracking and production load capacity are not yet verified.
+
+## Customer accounts and shopping
+
+Customers can sign in with ChatGPT, save addresses, maintain a wishlist, view linked purchases across devices, submit verified delivered-purchase reviews, and request returns. Product pages include related pieces and moderated ratings; the studio handles review moderation, return requests and basic operating summaries. See [operations](docs/OPERATIONS.md) for limits, sign-in behavior, and features requiring further integration.
