@@ -1,3 +1,5 @@
+import {invalidateCatalog} from '@/lib/catalog';
+import {kickJobs} from '@/lib/jobs';
 import { database, isAdmin, runtime, limit, cashfreeApi, cashfreeConfig, markOrderPaid, releaseExpiredReservations, releaseOrderReservation } from '@/lib/shop';
 import { z } from 'zod';
 import {onlineReady,expireReservations} from '@/lib/payments';
@@ -12,7 +14,7 @@ const product=z.object({id:z.string().max(80).optional(),name:z.string().trim().
 class ShopError extends Error{status:number;constructor(message:string,status=400){super(message);this.status=status;}}
 
 function session(r:Request){return r.headers.get('cookie')?.match(/(?:^|; )art_cart=([a-f0-9-]{36})(?:;|$)/)?.[1]||crypto.randomUUID();}
-function reply(data:any,s:string,status=200){return Response.json(data,{status,headers:{'Cache-Control':'no-store','Set-Cookie':`art_cart=${s}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000`}});}
+function reply(data:any,s:string,status=200){return Response.json(data,{status,headers:{'Cache-Control':'no-store',...(status===429?{'Retry-After':'60'}:{}),'Set-Cookie':`art_cart=${s}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000`}});}
 function jsonBody(raw:string){try{return z.record(z.unknown()).parse(JSON.parse(raw));}catch{throw new ShopError('Please send a valid request.',400);}}
 
 async function productLines(items:Array<{id:string;qty:number}>){
@@ -54,12 +56,12 @@ function publicOrder(order:any){
 export async function GET(req:Request){
  const s=session(req);
  try{
-  await releaseExpiredReservations();await expireReservations();
+  await limit(req,'shop-read',180);kickJobs();
   const db=database();
   const params=new URL(req.url).searchParams;
   if(params.get('studio')){
    if(!await isAdmin())return reply({error:'Studio access needs your approved owner email. Sign in with the owner account after setup.'},s,403);
-   return reply({products:(await db.prepare('SELECT * FROM products ORDER BY created DESC LIMIT 200').all()).results,orders:(await db.prepare('SELECT orders.*,payment_attempts.state AS payment_state,payment_attempts.payment_id AS payment_id FROM orders LEFT JOIN payment_attempts ON orders.id=payment_attempts.id ORDER BY orders.created DESC LIMIT 100').all()).results,onlinePayments:cashfreeConfig().enabled,cod:runtime().ENABLE_COD==='true'},s);
+   return reply({products:(await db.prepare('SELECT * FROM products ORDER BY created DESC LIMIT 200').all()).results,jobs:(await db.prepare('SELECT id,kind,state,attempts,updated FROM jobs ORDER BY updated DESC LIMIT 30').all()).results,orders:(await db.prepare('SELECT orders.*,payment_attempts.state AS payment_state,payment_attempts.payment_id AS payment_id FROM orders LEFT JOIN payment_attempts ON orders.id=payment_attempts.id ORDER BY orders.created DESC LIMIT 100').all()).results,onlinePayments:cashfreeConfig().enabled,cod:runtime().ENABLE_COD==='true'},s);
   }
   const paymentId=params.get('payment');
   if(paymentId){
@@ -75,13 +77,12 @@ export async function GET(req:Request){
    }
    return reply({order:publicOrder(order)},s);
   }
-  const products=(await db.prepare('SELECT * FROM products WHERE active=1 ORDER BY created DESC LIMIT 200').all()).results;
   const cart=await db.prepare('SELECT items FROM carts WHERE id=?').bind(s).first<any>();
   const cfg=cashfreeConfig();
-  const pendingCheckout=await db.prepare("SELECT id,state FROM payment_attempts WHERE session=? AND state IN ('pending','refund_required') ORDER BY created DESC LIMIT 1").bind(s).first();return reply({products,cart:cart?JSON.parse(cart.items):[],cod:runtime().ENABLE_COD==='true',online:onlineReady()||cfg.enabled,onlinePayments:cfg.enabled,paymentProvider:onlineReady()?'razorpay':cfg.enabled?'cashfree':'razorpay',cashfreeMode:cfg.mode,testPayments:onlineReady()?String(runtime().RAZORPAY_KEY_ID).startsWith('rzp_test_'):cfg.mode==='sandbox',pendingCheckout},s);
+  const pendingCheckout=await db.prepare("SELECT id,state FROM payment_attempts WHERE session=? AND state IN ('pending','refund_required') ORDER BY created DESC LIMIT 1").bind(s).first();return reply({cart:cart?JSON.parse(cart.items):[],cod:runtime().ENABLE_COD==='true',online:onlineReady()||cfg.enabled,onlinePayments:cfg.enabled,paymentProvider:onlineReady()?'razorpay':cfg.enabled?'cashfree':'razorpay',cashfreeMode:cfg.mode,testPayments:onlineReady()?String(runtime().RAZORPAY_KEY_ID).startsWith('rzp_test_'):cfg.mode==='sandbox',pendingCheckout},s);
  }catch(e:any){
   console.error(e);
-  return reply({error:e instanceof z.ZodError?'That payment reference is not valid.':e.message==='Too many requests. Please wait a minute.'?e.message:'The shop is temporarily unavailable. Please try again.'},s,e instanceof z.ZodError?400:503);
+  return reply({error:e instanceof z.ZodError?'That payment reference is not valid.':e.message==='Too many requests. Please wait a minute.'?e.message:'The shop is temporarily unavailable. Please try again.'},s,e instanceof z.ZodError?400:String(e).includes('Too many requests')?429:503);
  }
 }
 
@@ -103,6 +104,7 @@ export async function POST(req:Request){
    return reply({ok:true},s);
   }
 
+  if(b.action==='order'||b.action==='payment-init'){await releaseExpiredReservations();await expireReservations();}
   if(b.action==='order'){
    if(runtime().ENABLE_COD!=='true')throw new ShopError('Cash on delivery is not open yet. Your bag is saved.',409);
    const key=z.string().uuid().parse(b.key);if(await db.prepare('SELECT id FROM payment_attempts WHERE id=?').bind(key).first())throw new ShopError('An online checkout already uses this reference. Check its status first.',409);
@@ -144,12 +146,22 @@ export async function POST(req:Request){
   if(b.action==='product'){
    const p=product.parse(b.product);
    await db.prepare('INSERT INTO products(id,name,category,description,price,stock,image,active,created) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,category=excluded.category,description=excluded.description,price=excluded.price,stock=excluded.stock,image=excluded.image,active=excluded.active').bind(p.id||crypto.randomUUID(),p.name,p.category,p.description,p.price,p.stock,p.image,p.active,Date.now()).run();
+   await invalidateCatalog(req);
    return reply({ok:true},s);
+  }
+  if(b.action==='shipment'){
+   const data=z.object({id:z.string().uuid(),carrier:z.string().trim().max(80),trackingNumber:z.string().trim().max(120),trackingUrl:z.union([z.literal(''),z.string().url().max(1000).refine(v=>{const u=new URL(v);return u.protocol==='https:'&&!u.username&&!u.password;})])}).parse(b);
+   const found=await db.prepare('SELECT id FROM orders WHERE id=?').bind(data.id).first();if(!found)throw new ShopError('Order not found',404);
+   await db.prepare('UPDATE orders SET carrier=?,tracking_number=?,tracking_url=? WHERE id=?').bind(data.carrier,data.trackingNumber,data.trackingUrl,data.id).run();return reply({ok:true},s);
   }
   if(b.action==='status'){
    const status=z.enum(['Pending','Confirmed','Shipped','Delivered']).parse(b.status);
    const id=z.string().uuid().parse(b.id);
-   await db.prepare("UPDATE orders SET status=? WHERE id=? AND status NOT IN ('Refund required','Refunded') AND (payment_method='cod' OR payment_status='Paid')").bind(status,id).run();
+   const previous=await db.prepare('SELECT status,payment_method,payment_status FROM orders WHERE id=?').bind(id).first<any>();
+   if(!previous)throw new ShopError('Order not found',404);
+   const stages=['Pending','Confirmed','Shipped','Delivered'];
+   if(!stages.includes(previous.status)||stages.indexOf(status)<stages.indexOf(previous.status)||(previous.payment_method!=='cod'&&previous.payment_status!=='Paid'))throw new ShopError('This status transition is not allowed',409);
+   await db.prepare("UPDATE orders SET status=? WHERE id=? AND status NOT IN ('Refund required','Refunded') AND (payment_method='cod' OR payment_status='Paid') AND status=?").bind(status,id,previous.status).run();
    return reply({ok:true},s);
   }
   return reply({error:'Unknown action'},s,400);

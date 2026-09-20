@@ -4,8 +4,8 @@ import {readFileSync,readdirSync,mkdirSync,writeFileSync} from 'node:fs';
 import ts from 'typescript';
 const sqlite=new DatabaseSync(':memory:');
 for(const file of readdirSync('drizzle').filter(x=>x.endsWith('.sql')).sort())sqlite.exec(readFileSync('drizzle/'+file,'utf8'));
-function prepare(sql){let values=[];return {bind(...v){values=v;return this},async first(){return sqlite.prepare(sql).get(...values)||null},async all(){return {results:sqlite.prepare(sql).all(...values)}},async run(){return sqlite.prepare(sql).run(...values)}}}
-const db={prepare,async batch(statements){sqlite.exec('BEGIN');try{const result=[];for(const s of statements)result.push(await s.run());sqlite.exec('COMMIT');return result}catch(e){sqlite.exec('ROLLBACK');throw e}}};
+function prepare(sql){let values=[];return {bind(...v){values=v;return this},async first(){return sqlite.prepare(sql).get(...values)||null},async all(){return {results:sqlite.prepare(sql).all(...values)}},runSync(){return sqlite.prepare(sql).run(...values)},async run(){return this.runSync()}}}
+const db={prepare,async batch(statements){sqlite.exec('BEGIN');try{const result=[];for(const s of statements)result.push(s.runSync());sqlite.exec('COMMIT');return result}catch(e){sqlite.exec('ROLLBACK');throw e}}};
 const env={RAZORPAY_KEY_ID:'rzp_test_example',RAZORPAY_KEY_SECRET:'test-only-not-a-real-key',RAZORPAY_WEBHOOK_SECRET:'test-only-hook',ENABLE_ONLINE_PAYMENTS:'true'};
 globalThis.__paymentTest={database:()=>db,runtime:()=>env};
 mkdirSync('.sites-runtime',{recursive:true});
@@ -32,3 +32,8 @@ seed('d',1);const mismatch=await createCheckout(input('d'),'different');capture(
 const secret='signature-test';const payload='order_example|pay_example';const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);const sig=Buffer.from(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(payload))).toString('hex');assert.equal(await verifyHmac(payload,sig,secret),true);assert.equal(await verifyHmac(payload+'tampered',sig,secret),false);assert.equal(await verifyHmac(payload,'invalid',secret),false);
 await assert.rejects(()=>boundedText(new Request('https://example.com',{method:'POST',body:'123456'}),5),/too large/);
 console.log('PASS: server pricing, duplicate create/capture, stock limits, expiry idempotency, late capture/reallocation, refund reconciliation, amount checks, HMAC tampering, body limits');
+
+seed('concurrent-original',1);
+const racers=await Promise.allSettled(Array.from({length:25},(_,i)=>createCheckout(input('concurrent-original'),'racer-'+i)));
+assert.equal(racers.filter(r=>r.status==='fulfilled').length,1);assert.equal(stock('concurrent-original'),0);
+console.log('PASS: 25 simultaneous checkout attempts for one original reserve exactly one unit');

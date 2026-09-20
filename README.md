@@ -42,7 +42,7 @@ Subscribe to `payment.captured`, `order.paid`, and `refund.processed`. Keep Test
 
 ## Payment behavior
 
-Server-calculated prices and a provider order ID drive checkout. Stock is reserved for 30 minutes, then released during subsequent shop reads or checkout requests. No background scheduler is required to reclaim stock before a new checkout. Signed callbacks and signed raw-body webhooks are verified; payment amount/currency/capture status are also fetched from the provider. Duplicate confirmations do not create duplicate orders or reduce stock again.
+Server-calculated prices and a provider order ID drive checkout. Stock is reserved for 30 minutes. Checkout reclaims expired reservations synchronously; background maintenance also reclaims them through the durable job runner. Signed callbacks and signed raw-body webhooks are verified; payment amount/currency/capture status are also fetched from the provider. Duplicate confirmations do not create duplicate orders or reduce stock again.
 
 After an expired reservation, a late capture tries to allocate stock again. If stock is no longer available, the order is marked **Refund required** and cannot be marked shipped. The owner must issue the refund in the Razorpay dashboard; full-refund events update the order. Refunds do not automatically replenish fulfilled stock. Partial refunds and disputes are managed in the Razorpay dashboard.
 
@@ -75,3 +75,7 @@ Sample artwork sources are in IMAGE-SOURCES.md. Replace demonstration images and
 ## Marketplace roadmap
 
 See [the proposed architecture](docs/ARCHITECTURE-ROADMAP.md) for the owner’s multi-vendor art marketplace requirements and the boundary between implemented features and planned services.
+
+## Tracking and operations
+
+Customer order tracking, owner courier details, short-lived catalog caching and durable webhook jobs are implemented. See [operations and scheduler setup](docs/OPERATIONS.md) for exact limits, tests and remaining integrations. The optional scheduled runner still needs its shared secret configured. Live courier tracking and production load capacity are not yet verified.

@@ -1,0 +1,27 @@
+name: Process Artelier background jobs
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/5 * * * *'
+permissions: {}
+concurrency:
+  group: artelier-job-runner
+  cancel-in-progress: false
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Process durable jobs
+        env:
+          JOB_RUNNER_SECRET: ${{ secrets.JOB_RUNNER_SECRET }}
+        run: |
+          if [ -z "$JOB_RUNNER_SECRET" ]; then
+            echo 'JOB_RUNNER_SECRET is not configured. Scheduled processing is inactive.'
+            exit 0
+          fi
+          curl --fail-with-body --silent --show-error --max-time 45 \
+            --retry 2 --retry-delay 5 \
+            -X POST 'https://artelier-saransh.ethanhuntss.chatgpt.site/api/jobs' \
+            -H "Authorization: Bearer $JOB_RUNNER_SECRET" \
+            -H 'Content-Type: application/json' --data '{}'
