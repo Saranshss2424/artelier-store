@@ -1,0 +1,4 @@
+import {getChatGPTUser,chatGPTSignInPath} from '@/app/chatgpt-auth';
+import Seller from './seller';
+export const dynamic='force-dynamic';
+export default async function Page(){const user=await getChatGPTUser();return <><header className="header"><a className="brand" href="/">artelier<span>✳</span></a><a href="/account">Buyer account</a></header><main className="studio"><span className="eyebrow">SELL WITH ARTELIER</span><h1>Your seller space.</h1><p>Apply to sell your work. Once approved, upload your pieces here for listing review.</p>{user?<Seller/>:<div className="studio-gate"><h2>Become a seller</h2><p>Signing in creates no selling permissions. Submit an application and wait for approval from Artelier.</p><a className="primary" href={chatGPTSignInPath('/sell')} target="_top">Sign in to apply</a></div>}<p><a href="/studio">Store owner administration</a></p></main></>}

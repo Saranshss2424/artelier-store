@@ -83,3 +83,7 @@ Customer order tracking, owner courier details, short-lived catalog caching and 
 ## Customer accounts and shopping
 
 Customers can sign in with ChatGPT, save addresses, maintain a wishlist, view linked purchases across devices, submit verified delivered-purchase reviews, and request returns. Product pages include related pieces and moderated ratings; the studio handles review moderation, return requests and basic operating summaries. See [operations](docs/OPERATIONS.md) for limits, sign-in behavior, and features requiring further integration.
+
+### Email, courier tracking and multi-artist earnings
+
+Studio now includes Resend order-status email monitoring, Shiprocket AWB tracking, artist assignments and immutable commission snapshots, plus owner-reviewed Razorpay Route transfers. All require provider setup before live use. See [integration setup and limitations](docs/INTEGRATIONS.md). Booking/labels remain in Shiprocket; bank settlement and post-transfer refunds remain provider-managed.

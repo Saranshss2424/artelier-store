@@ -147,6 +147,7 @@ export async function POST(req:Request){
   if(!await isAdmin())return reply({error:'Owner access required.'},s,403);
   if(b.action==='product'){
    const p=product.parse(b.product);
+   if(p.active&&p.id&&await db.prepare("SELECT sp.product_id FROM seller_products sp JOIN sellers s ON s.user_id=sp.user_id WHERE sp.product_id=? AND s.status<>'Approved'").bind(p.id).first())throw new ShopError('Approve the seller before publishing their artwork',403);
    await db.prepare('INSERT INTO products(id,name,category,description,price,stock,image,active,created) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,category=excluded.category,description=excluded.description,price=excluded.price,stock=excluded.stock,image=excluded.image,active=excluded.active').bind(p.id||crypto.randomUUID(),p.name,p.category,p.description,p.price,p.stock,p.image,p.active,Date.now()).run();
    await invalidateCatalog(req);
    return reply({ok:true},s);

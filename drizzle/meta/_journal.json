@@ -36,6 +36,27 @@
       "when": 1789910277792,
       "tag": "0004_serious_omega_red",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1789913828621,
+      "tag": "0005_closed_mac_gargan",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1790183595305,
+      "tag": "0006_wide_gravity",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1790183813810,
+      "tag": "0007_easy_nightcrawler",
+      "breakpoints": true
     }
   ]
 }

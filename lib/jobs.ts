@@ -1,9 +1,12 @@
+import {scheduleIntegrations,sendOrderEmail,syncShipment} from './integrations';
 import {after} from 'next/server';
 import {database,releaseExpiredReservations,markOrderPaid,releaseOrderReservation} from './shop';
 import {confirmPayment,reconcileRefund,expireReservations} from './payments';
 import {enqueue,runOne} from './job-queue';
 export {enqueue};
 export async function handleJob(kind:string,p:any){
+ if(kind==='email'){await sendOrderEmail(p.id);return;}
+ if(kind==='courier'){await syncShipment(p.id);return;}
  if(kind==='capture'){await confirmPayment(p.paymentId);return;}
  if(kind==='refund'){await reconcileRefund(p.paymentId);return;}
  if(kind==='cashfree'){
@@ -13,7 +16,7 @@ export async function handleJob(kind:string,p:any){
   else if(['FAILED','USER_DROPPED'].includes(p.status))await releaseOrderReservation(order,p.status==='USER_DROPPED'?'Cancelled':'Failed');
   return;
  }
- if(kind==='maintenance'){await expireReservations();await releaseExpiredReservations();return;}
+ if(kind==='maintenance'){await expireReservations();await releaseExpiredReservations();await scheduleIntegrations();return;}
  throw Error('Unknown job type');
 }
 export async function drainJobs(){
