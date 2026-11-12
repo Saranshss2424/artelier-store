@@ -1,0 +1,35 @@
+SARANSH SAHU
+
+Freelance services & selected work   |   Bengaluru, India
+
+EXPERIENCE
+
+Service Virtualization Developer · Payments and retail APIs
+
+Built payment simulations with ReadyAPI, Groovy and SQL. Automated QA approvals and incident triage. Supported a non-production load test in which throughput rose from 38 to 75 orders per minute after database optimisation.
+
+PROJECTS
+
+Artelier — Expanded an art store into a custom press-on nail shop. The checkout captures ten confirmed widths per wearer, and the owner reviews seller applications and listings.
+
+Source: https://github.com/Saranshss2424/artelier-store
+
+Ten Tiny Canvases — Timed storyboard for a 12-second product ad, from the first brushstroke to the final set reveal.
+
+FREELANCE RATE CARD
+
+Service | Included scope | Starting fee
+
+AI product reel | One 10–15 sec vertical edit from a supplied brief; one revision | ₹4,500
+
+Website repair | Diagnose and fix one reproducible issue; verify the fix | ₹2,500
+
+Website expansion | One scoped feature on an existing site, e.g. a form with validation | ₹8,000
+
+Latency audit | Profile one user flow; report bottlenecks and baseline timings | ₹5,000
+
+Performance fix | Implement one agreed fix and retest under comparable load | ₹7,500
+
+QUOTE TERMS
+
+Fees are in INR and confirmed against the brief. Audit and implementation are priced separately. Hosting, paid generation credits and licensed assets are extra only if agreed in advance. Suggested payment: 50% to start, 50% on delivery.
