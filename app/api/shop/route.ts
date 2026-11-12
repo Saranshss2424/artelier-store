@@ -1,3 +1,4 @@
+import {checkedFit,nailCategory} from '@/lib/nail-fit';
 import {getChatGPTUser} from '@/app/chatgpt-auth';
 import {invalidateCatalog} from '@/lib/catalog';
 import {kickJobs} from '@/lib/jobs';
@@ -10,7 +11,7 @@ export const dynamic='force-dynamic';
 
 const item=z.object({id:z.string().max(80),qty:z.number().int().min(1).max(99)});
 const customer=z.object({name:z.string().trim().min(2).max(100),email:z.string().email().max(150),phone:z.string().regex(/^[+0-9 ()-]{8,20}$/),address:z.string().trim().min(10).max(500),city:z.string().trim().min(2).max(80),pin:z.string().regex(/^[0-9]{6}$/)});
-const product=z.object({id:z.string().max(80).optional(),name:z.string().trim().min(2).max(120),category:z.enum(['Original art','Art prints','Ceramics','Handmade']),description:z.string().trim().min(5).max(3000),price:z.number().int().min(100).max(100000000),stock:z.number().int().min(0).max(100000),image:z.string().regex(/^\/api\/image\?id=[a-zA-Z0-9-]+$/),active:z.number().int().min(0).max(1)});
+const product=z.object({id:z.string().max(80).optional(),name:z.string().trim().min(2).max(120),category:z.enum(['Press-on nails','Original art','Art prints','Ceramics','Handmade']),description:z.string().trim().min(5).max(3000),price:z.number().int().min(100).max(100000000),stock:z.number().int().min(0).max(100000),image:z.string().regex(/^\/api\/image\?id=[a-zA-Z0-9-]+$/),active:z.number().int().min(0).max(1)});
 
 class ShopError extends Error{status:number;constructor(message:string,status=400){super(message);this.status=status;}}
 
@@ -18,21 +19,22 @@ function session(r:Request){return r.headers.get('cookie')?.match(/(?:^|; )art_c
 function reply(data:any,s:string,status=200){return Response.json(data,{status,headers:{'Cache-Control':'no-store',...(status===429?{'Retry-After':'60'}:{}),'Set-Cookie':`art_cart=${s}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000`}});}
 function jsonBody(raw:string){try{return z.record(z.unknown()).parse(JSON.parse(raw));}catch{throw new ShopError('Please send a valid request.',400);}}
 
-async function productLines(items:Array<{id:string;qty:number}>){
+async function productLines(items:Array<{id:string;qty:number}>,fit:unknown){
  const db=database();
  const lines:any[]=[];
  for(const i of items){
-  const p=await db.prepare('SELECT id,name,price,stock FROM products WHERE id=? AND active=1').bind(i.id).first<any>();
+  const p=await db.prepare('SELECT id,name,price,stock,category FROM products WHERE id=? AND active=1').bind(i.id).first<any>();
   if(!p)throw new ShopError('An item in your bag is no longer available.',409);
   if(p.stock<i.qty)throw new ShopError('An item is no longer available in this quantity. Please update your bag.',409);
-  lines.push({id:p.id,name:p.name,price:p.price,qty:i.qty});
+  let nailFit; if(p.category===nailCategory){try{nailFit=checkedFit(fit)}catch{throw new ShopError('Confirm all ten nail sizes before ordering.')}}
+  lines.push({...(nailFit?{nailFit}:{}),id:p.id,name:p.name,price:p.price,qty:i.qty});
  }
  return {lines,total:lines.reduce((n,p)=>n+p.price*p.qty,0)};
 }
 
-async function reserveOrder(orderId:string,s:string,customerData:any,items:Array<{id:string;qty:number}>,paymentMethod:'cod'|'online',userId:string|null=null){
+async function reserveOrder(orderId:string,s:string,customerData:any,items:Array<{id:string;qty:number}>,paymentMethod:'cod'|'online',userId:string|null=null,fit?:unknown){
  const db=database();
- const {lines,total}=await productLines(items);
+ const {lines,total}=await productLines(items,fit);
  const gatewayOrderId=paymentMethod==='online'?`art_${orderId.replaceAll('-','')}`:null;
  await db.batch([
   ...lines.map(p=>db.prepare('UPDATE products SET stock=stock-? WHERE id=?').bind(p.qty,p.id)),
@@ -114,7 +116,7 @@ export async function POST(req:Request){
    if(existing)return reply({order:publicOrder(existing)},s);
    const details=customer.parse(b.customer);
    const items=z.array(item).min(1).max(40).parse(b.items);
-   const {total}=await reserveOrder(key,s,details,items,'cod',(await getChatGPTUser())?.userId||null);
+   const {total}=await reserveOrder(key,s,details,items,'cod',(await getChatGPTUser())?.userId||null,b.fit);
    return reply({order:{id:key,total,payment_method:'cod',payment_status:'Unpaid'}},s,201);
   }
 
@@ -127,7 +129,7 @@ export async function POST(req:Request){
    if(existing)throw new ShopError('This checkout attempt has expired. Refresh your bag and try again.',409);
    const details=customer.parse(b.customer);
    const items=z.array(item).min(1).max(40).parse(b.items);
-   const {total,gatewayOrderId}=await reserveOrder(key,s,details,items,'online',(await getChatGPTUser())?.userId||null);
+   const {total,gatewayOrderId}=await reserveOrder(key,s,details,items,'online',(await getChatGPTUser())?.userId||null,b.fit);
    const origin=new URL(req.url).origin;
    try{
     const r=await cashfreeApi('/orders',{method:'POST',headers:{'x-idempotency-key':key},body:JSON.stringify({order_id:gatewayOrderId,order_amount:total/100,order_currency:'INR',customer_details:{customer_id:s,customer_name:details.name,customer_email:details.email,customer_phone:details.phone.replace(/[^0-9]/g,'')},order_meta:{return_url:`${origin}/?payment=${encodeURIComponent(key)}`,notify_url:`${origin}/api/payment/webhook`},order_note:'Artelier artwork order',order_tags:{internal_order_id:key}})});

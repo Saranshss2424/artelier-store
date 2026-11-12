@@ -10,6 +10,7 @@ const env={RAZORPAY_KEY_ID:'rzp_test_example',RAZORPAY_KEY_SECRET:'test-only-not
 globalThis.__paymentTest={database:()=>db,runtime:()=>env};
 mkdirSync('.sites-runtime',{recursive:true});
 let source=ts.transpileModule(readFileSync('lib/payments.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText.replace("import { database, runtime } from './shop';","const {database,runtime}=globalThis.__paymentTest;");
+source=source.replace("'./nail-fit'","'../lib/nail-fit.ts'");
 writeFileSync('.sites-runtime/payment-test-module.mjs',source);
 writeFileSync('.sites-runtime/security-test-module.mjs',ts.transpileModule(readFileSync('lib/payment-security.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText);
 const {createCheckout,confirmPayment,expireReservations,reconcileRefund}=await import('../.sites-runtime/payment-test-module.mjs');
@@ -38,3 +39,8 @@ const racers=await Promise.allSettled(Array.from({length:25},(_,i)=>createChecko
 assert.equal(racers.filter(r=>r.status==='fulfilled').length,1);assert.equal(stock('concurrent-original'),0);
 console.log('PASS: 25 simultaneous checkout attempts for one original reserve exactly one unit');
 seed('account-art',1);const accountAttempt=await createCheckout({...input('account-art'),userId:'forged-user'},'account-session','verified-user');capture(accountAttempt,'pay_Account');await confirmPayment('pay_Account');assert.equal(sqlite.prepare('SELECT user_id FROM order_owners WHERE order_id=?').get(accountAttempt.id).user_id,'verified-user');console.log('PASS: account ownership is attached from trusted server identity and survives payment reconciliation');
+
+seed('nail-set',2);sqlite.prepare("UPDATE products SET category='Press-on nails' WHERE id='nail-set'").run();
+await assert.rejects(()=>createCheckout(input('nail-set'),'fitter'),/ten nail widths/);assert.equal(stock('nail-set'),2);
+const fit={left:[16,12,13,12,9],right:[16.5,12.2,13,12.5,9],confirmed:true};
+const na=await createCheckout({...input('nail-set'),fit},'fitter');capture(na,'pay_Nail');await confirmPayment('pay_Nail');assert.deepEqual(JSON.parse(sqlite.prepare('SELECT items FROM orders WHERE id=?').get(na.id).items)[0].nailFit,fit);

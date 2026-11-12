@@ -2,11 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Artelier — Art for your everyday",
-  description: "Discover original art, thoughtful prints and handmade objects.",
-  other: {
-    "codex-preview": "development",
-  },
+  title: "Artelier — Custom press-on nail studio",
+  description: "Choose custom press-on nail designs and measure your fit before ordering.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
