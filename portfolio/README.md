@@ -1,0 +1,39 @@
+# Saransh Sahu | Motion, Web & Performance
+
+I’m Saransh Sahu, an engineer in Bengaluru. I work on the parts of a digital experience people notice: whether a story holds their attention, a checkout remembers their choices, or a busy service makes them wait.
+
+## AI video generation
+
+From a brief to a shot list, with character references, camera direction, dialogue timing and an edit plan.
+
+**Concept study · Ten Tiny Canvases**
+
+0–3s: A brush draws a cherry-red line across one nail tip. 3–7s: Match cut to the same line running through a complete set. 7–12s: A hand turns in window light; the polish catches the light before the title appears.
+
+*Pre-production sample · storyboard, not a finished reel*
+
+## Website correction & expansion
+
+I trace the customer journey, fix the point where it breaks, and carry new features through the interface, API and order record.
+
+**Build · Artelier custom press-ons**
+
+Artelier began as an art shop. I adapted its checkout so a custom nail set requires ten confirmed widths. The studio receives those widths with the order. Buyers shop; artists apply separately and can manage only their own listings.
+
+*Delivered · sizing guide, checkout validation and seller roles*
+
+## Latency diagnosis & correction
+
+I separate time spent at the API, database and queue, then compare the same workload before and after a change.
+
+**Engineering example · payment testing**
+
+In a non-production launch test, throughput rose from 38 to 75 orders per minute after database optimisation. Some payment calls remained slow. That distinction matters: higher throughput does not prove lower p95 latency.
+
+*Reported test result · throughput, not a production latency benchmark*
+
+## Inside Artelier
+
+- [Explore Artelier’s source](https://github.com/Saranshss2424/artelier-store)
+- [Inspect checkout tests](https://github.com/Saranshss2424/artelier-store/blob/main/tests/payments.test.mjs)
+- [View camera scanner prototype](https://github.com/Saranshss2424/artelier-store/pull/1)
