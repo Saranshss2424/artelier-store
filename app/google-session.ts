@@ -76,7 +76,7 @@ export async function readGoogleSession(cookieHeader: string | null): Promise<Se
     if (!token || token.length > 8192) return null;
     const [data, sig, extra] = token.split(".");
     if (!data || !sig || extra) return null;
-    if (!await crypto.subtle.verify("HMAC", await hmacKey(), base64UrlToBytes(sig), new TextEncoder().encode(data))) return null;
+    if (!await crypto.subtle.verify("HMAC", await hmacKey(), new Uint8Array(base64UrlToBytes(sig)), new TextEncoder().encode(data))) return null;
     const value = jsonPart<Session>(data);
     const now = Math.floor(Date.now() / 1000);
     if (!value.sub || !value.email || typeof value.exp !== "number" || value.exp <= now || value.exp > now + SESSION_SECONDS) return null;
@@ -124,7 +124,7 @@ export async function verifyGoogleCredential(credential: string, nonce: string):
   const jwk = jwks.keys.find(k => k.kid === header.kid && k.kty === "RSA");
   if (!jwk) throw new Error("Google verification key unavailable");
   const key = await crypto.subtle.importKey("jwk", jwk, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
-  const verified = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, base64UrlToBytes(parts[2]), new TextEncoder().encode(parts[0] + "." + parts[1]));
+  const verified = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, new Uint8Array(base64UrlToBytes(parts[2])), new TextEncoder().encode(parts[0] + "." + parts[1]));
   if (!verified) throw new Error("Invalid Google signature");
   return claims;
 }
